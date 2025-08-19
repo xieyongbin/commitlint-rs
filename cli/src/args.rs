@@ -1,6 +1,6 @@
 use std::{
     fmt::Error,
-    io::{stdin, IsTerminal, Read},
+    io::{stdin, IsTerminal},
     path::PathBuf,
 };
 
@@ -56,17 +56,22 @@ impl Args {
         if let Some(edit) = self.edit.as_deref() {
             if edit != "false" {
                 let msg = std::fs::read_to_string(edit)
-                    .expect(format!("Failed to read commit message from {}", edit).as_str());
+                    .expect(format!("Failed to read commit message from {}", edit).as_str())
+                    .lines()
+                    .filter(|s| !s.starts_with('#'))
+                    .collect();
                 return Ok(vec![Message::new(msg)]);
             }
         }
 
         // Otherwise, check for stdin and use the incoming text buffer from there if so.
         if self.has_stdin() {
-            let mut buffer = String::new();
-            stdin()
-                .read_to_string(&mut buffer)
-                .expect("Failed to read commit messages from stdin");
+            let buffer = stdin()
+                .lines()
+                .map(|s| s.expect("Failed to read commit messages from stdin"))
+                .filter(|s| !s.starts_with('#'))
+                .collect::<Vec<_>>()
+                .join("\n");
             return Ok(vec![Message::new(buffer)]);
         }
 
@@ -87,13 +92,17 @@ impl Args {
         }
 
         let default_path = std::path::PathBuf::from(".git").join("COMMIT_EDITMSG");
-        let msg = std::fs::read_to_string(&default_path).expect(
-            format!(
-                "Failed to read commit message from {}",
-                default_path.display()
+        let msg = std::fs::read_to_string(&default_path)
+            .expect(
+                format!(
+                    "Failed to read commit message from {}",
+                    default_path.display()
+                )
+                .as_str(),
             )
-            .as_str(),
-        );
+            .lines()
+            .filter(|s| !s.starts_with('#'))
+            .collect();
         Ok(vec![Message::new(msg)])
     }
 }
